@@ -308,6 +308,9 @@ def render_scene(args,
 
   # Now make some random objects
   objects, blender_objects = add_random_objects(scene_struct, num_objects, args, camera)
+  print(utils.__file__)
+  for idx, blender_obj in enumerate(blender_objects):
+    objects[idx]['bounding_box'] = utils.write_bounds_2d(bpy.context.scene, camera, blender_obj)
 
   # Render the scene and dump the scene data structure
   scene_struct['objects'] = objects
