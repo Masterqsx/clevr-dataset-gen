@@ -10,6 +10,40 @@ import math, sys, random, argparse, json, os, tempfile
 from datetime import datetime as dt
 from collections import Counter
 
+# Tail recursion optimization decorator
+# use exception to exit the next level and use catch to continue running
+class TailRecurseException(Exception):
+    def __init__(self, args, kwargs):
+        self.args = args
+        self.kwargs = kwargs
+
+def tail_call_optimized(g):
+    """
+    This function decorates a function with tail call
+    optimization. It does this by throwing an exception
+    if it is it's own grandparent, and catching such
+    exceptions to fake the tail call optimization.
+
+    This function fails if the decorated
+    function recurses in a non-tail context.
+    """
+    def func(*args, **kwargs):
+        f = sys._getframe()
+        if f.f_back and f.f_back.f_back \
+            and f.f_back.f_back.f_code == f.f_code:
+            # throw exception
+            print("OPTIMIZE TAIL RECURSION!")
+            raise TailRecurseException(args, kwargs)
+        else:
+            while 1:
+                try:
+                    return g(*args, **kwargs)
+                except TailRecurseException as e:
+                    args = e.args
+                    kwargs = e.kwargs
+    func.__doc__ = g.__doc__
+    return func
+
 """
 Renders random scenes using Blender, each with with a random number of objects;
 each object has a random size, position, color, and shape. Objects will be
@@ -103,7 +137,7 @@ parser.add_argument('--output_scene_dir', default='../output/scenes/',
          "It will be created if it does not exist.")
 parser.add_argument('--output_scene_file', default='../output/CLEVR_scenes.json',
     help="Path to write a single JSON file containing all scene information")
-parser.add_argument('--output_blend_dir', default='output/blendfiles',
+parser.add_argument('--output_blend_dir', default='../output/blendfiles',
     help="The directory where blender scene files will be stored, if the " +
          "user requested that these files be saved using the " +
          "--save_blendfiles flag; in this case it will be created if it does " +
@@ -328,7 +362,7 @@ def render_scene(args,
   if output_blendfile is not None:
     bpy.ops.wm.save_as_mainfile(filepath=output_blendfile)
 
-
+@tail_call_optimized
 def add_random_objects(scene_struct, num_objects, args, camera):
   """
   Add random objects to the current blender scene
@@ -366,6 +400,7 @@ def add_random_objects(scene_struct, num_objects, args, camera):
       # the objects in the scene and start over.
       num_tries += 1
       if num_tries > args.max_retries:
+        print('MORE THAN MAX RETRIES!')
         for obj in blender_objects:
           utils.delete_object(obj)
         return add_random_objects(scene_struct, num_objects, args, camera)
